@@ -1,13 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-)
+	c "fortune-teller/config"
 
-const TOKEN = "XXX"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/spf13/viper"
+)
 
 var bot *tgbotapi.BotAPI
 var chatId int64
@@ -49,9 +51,9 @@ var answers = []string{
 	"Жизнь - это не ожидание бури, а учение танцевать под дождем.  Сэнди Шоу",
 }
 
-func connectWithTelegram() {
+func connectWithTelegram(token string) {
 	var err error
-	if bot, err = tgbotapi.NewBotAPI(TOKEN); err != nil {
+	if bot, err = tgbotapi.NewBotAPI(token); err != nil {
 		panic("Cannot connect to Telegram ")
 	}
 }
@@ -84,12 +86,35 @@ func sendAnswer(update *tgbotapi.Update) {
 	bot.Send(msg)
 }
 
+func LoadConfig(path string) (config c.Configurations, err error) {
+	viper.AddConfigPath(path)
+	viper.SetConfigName("config")
+	viper.SetConfigType("yml")
+
+	viper.AutomaticEnv()
+
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	err = viper.Unmarshal(&config)
+	return
+}
+
 func main() {
-	connectWithTelegram()
+	config, err := LoadConfig(".")
+	if err != nil {
+		fmt.Println("cannot load config:", err)
+	}
+
+	connectWithTelegram(config.TELEGRAM_TOKEN)
 	updateConfig := tgbotapi.NewUpdate(0)
 	for update := range bot.GetUpdatesChan(updateConfig) {
 		if update.Message != nil && update.Message.Text == "/start" {
+			fmt.Println(&update)
 			chatId = update.Message.Chat.ID
+
 			sendMessage("Задай свой вопрос, назвав меня по имени. Ответом на вопрос должны быть \"Да\" либо \"Нет\". Например, \" Денис, я готов сменить работу?\" либо \"Денис, я действительно хочу отправиться на эту вечеринку?\"")
 		}
 		if isMessageForFortuneTeller(&update) {
